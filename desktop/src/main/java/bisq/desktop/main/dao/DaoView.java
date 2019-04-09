@@ -27,14 +27,18 @@ import bisq.desktop.common.view.ViewLoader;
 import bisq.desktop.main.MainView;
 import bisq.desktop.main.dao.bonding.BondingView;
 import bisq.desktop.main.dao.burnbsq.BurnBsqView;
+import bisq.desktop.main.dao.economy.EconomyView;
 import bisq.desktop.main.dao.governance.GovernanceView;
+import bisq.desktop.main.dao.monitor.MonitorView;
+import bisq.desktop.main.dao.news.NewsView;
 import bisq.desktop.main.dao.wallet.BsqWalletView;
-import bisq.desktop.main.dao.wallet.dashboard.BsqDashboardView;
+import bisq.desktop.main.dao.wallet.send.BsqSendView;
 import bisq.desktop.main.overlays.popups.Popup;
 
-import bisq.core.app.BisqEnvironment;
 import bisq.core.dao.governance.votereveal.VoteRevealService;
 import bisq.core.locale.Res;
+
+import bisq.common.app.DevEnv;
 
 import javax.inject.Inject;
 
@@ -50,7 +54,7 @@ import javafx.beans.value.ChangeListener;
 public class DaoView extends ActivatableViewAndModel<TabPane, Activatable> {
 
     @FXML
-    private Tab bsqWalletTab, proposalsTab, bondingTab, burnBsqTab;
+    private Tab bsqWalletTab, proposalsTab, bondingTab, burnBsqTab, daoNewsTab, monitorTab, factsAndFiguresTab;
 
     private Navigation.Listener navigationListener;
     private ChangeListener<Tab> tabChangeListener;
@@ -74,29 +78,39 @@ public class DaoView extends ActivatableViewAndModel<TabPane, Activatable> {
 
     @Override
     public void initialize() {
+        factsAndFiguresTab = new Tab(Res.get("dao.tab.factsAndFigures").toUpperCase());
         bsqWalletTab = new Tab(Res.get("dao.tab.bsqWallet").toUpperCase());
         proposalsTab = new Tab(Res.get("dao.tab.proposals").toUpperCase());
         bondingTab = new Tab(Res.get("dao.tab.bonding").toUpperCase());
         burnBsqTab = new Tab(Res.get("dao.tab.proofOfBurn").toUpperCase());
+        monitorTab = new Tab(Res.get("dao.tab.monitor").toUpperCase());
 
+        factsAndFiguresTab.setClosable(false);
         bsqWalletTab.setClosable(false);
         proposalsTab.setClosable(false);
         bondingTab.setClosable(false);
         burnBsqTab.setClosable(false);
+        monitorTab.setClosable(false);
 
-        if (!BisqEnvironment.isDAOActivatedAndBaseCurrencySupportingBsq()) {
+        if (!DevEnv.isDaoActivated()) {
+            factsAndFiguresTab.setDisable(true);
+            bsqWalletTab.setDisable(true);
             proposalsTab.setDisable(true);
             bondingTab.setDisable(true);
             burnBsqTab.setDisable(true);
-            root.getTabs().addAll(bsqWalletTab);
+            monitorTab.setDisable(true);
+
+            daoNewsTab = new Tab(Res.get("dao.tab.news").toUpperCase());
+
+            root.getTabs().add(daoNewsTab);
         } else {
-            root.getTabs().addAll(bsqWalletTab, proposalsTab, bondingTab, burnBsqTab);
+            root.getTabs().addAll(factsAndFiguresTab, bsqWalletTab, proposalsTab, bondingTab, burnBsqTab, monitorTab);
         }
 
         navigationListener = viewPath -> {
             if (viewPath.size() == 3 && viewPath.indexOf(DaoView.class) == 1) {
-                if (proposalsTab == null && viewPath.get(2).equals(BsqWalletView.class))
-                    navigation.navigateTo(MainView.class, DaoView.class, BsqWalletView.class);
+                if (proposalsTab == null && viewPath.get(2).equals(EconomyView.class))
+                    navigation.navigateTo(MainView.class, DaoView.class, EconomyView.class);
                 else
                     loadView(viewPath.tip());
             }
@@ -104,9 +118,9 @@ public class DaoView extends ActivatableViewAndModel<TabPane, Activatable> {
 
         tabChangeListener = (ov, oldValue, newValue) -> {
             if (newValue == bsqWalletTab) {
-                Class<? extends View> selectedViewClass = bsqWalletView.getSelectedViewClass();
+                Class<? extends View> selectedViewClass = bsqWalletView != null ? bsqWalletView.getSelectedViewClass() : null;
                 if (selectedViewClass == null)
-                    navigation.navigateTo(MainView.class, DaoView.class, BsqWalletView.class, BsqDashboardView.class);
+                    navigation.navigateTo(MainView.class, DaoView.class, BsqWalletView.class, BsqSendView.class);
                 else
                     navigation.navigateTo(MainView.class, DaoView.class, BsqWalletView.class, selectedViewClass);
             } else if (newValue == proposalsTab) {
@@ -115,25 +129,37 @@ public class DaoView extends ActivatableViewAndModel<TabPane, Activatable> {
                 navigation.navigateTo(MainView.class, DaoView.class, BondingView.class);
             } else if (newValue == burnBsqTab) {
                 navigation.navigateTo(MainView.class, DaoView.class, BurnBsqView.class);
+            } else if (newValue == factsAndFiguresTab) {
+                navigation.navigateTo(MainView.class, DaoView.class, EconomyView.class);
+            } else if (newValue == monitorTab) {
+                navigation.navigateTo(MainView.class, DaoView.class, MonitorView.class);
             }
         };
     }
 
     @Override
     protected void activate() {
-        navigation.addListener(navigationListener);
-        root.getSelectionModel().selectedItemProperty().addListener(tabChangeListener);
+        if (DevEnv.isDaoActivated()) {
+            navigation.addListener(navigationListener);
+            root.getSelectionModel().selectedItemProperty().addListener(tabChangeListener);
 
-        if (navigation.getCurrentPath().size() == 2 && navigation.getCurrentPath().get(1) == DaoView.class) {
-            Tab selectedItem = root.getSelectionModel().getSelectedItem();
-            if (selectedItem == bsqWalletTab)
-                navigation.navigateTo(MainView.class, DaoView.class, BsqWalletView.class);
-            else if (selectedItem == proposalsTab)
-                navigation.navigateTo(MainView.class, DaoView.class, GovernanceView.class);
-            else if (selectedItem == bondingTab)
-                navigation.navigateTo(MainView.class, DaoView.class, BondingView.class);
-            else if (selectedItem == burnBsqTab)
-                navigation.navigateTo(MainView.class, DaoView.class, BurnBsqView.class);
+            if (navigation.getCurrentPath().size() == 2 && navigation.getCurrentPath().get(1) == DaoView.class) {
+                Tab selectedItem = root.getSelectionModel().getSelectedItem();
+                if (selectedItem == bsqWalletTab)
+                    navigation.navigateTo(MainView.class, DaoView.class, BsqWalletView.class);
+                else if (selectedItem == proposalsTab)
+                    navigation.navigateTo(MainView.class, DaoView.class, GovernanceView.class);
+                else if (selectedItem == bondingTab)
+                    navigation.navigateTo(MainView.class, DaoView.class, BondingView.class);
+                else if (selectedItem == burnBsqTab)
+                    navigation.navigateTo(MainView.class, DaoView.class, BurnBsqView.class);
+                else if (selectedItem == factsAndFiguresTab)
+                    navigation.navigateTo(MainView.class, DaoView.class, EconomyView.class);
+                else if (selectedItem == monitorTab)
+                    navigation.navigateTo(MainView.class, DaoView.class, MonitorView.class);
+            }
+        } else {
+            loadView(NewsView.class);
         }
     }
 
@@ -163,6 +189,12 @@ public class DaoView extends ActivatableViewAndModel<TabPane, Activatable> {
             selectedTab = bondingTab;
         } else if (view instanceof BurnBsqView) {
             selectedTab = burnBsqTab;
+        } else if (view instanceof MonitorView) {
+            selectedTab = monitorTab;
+        } else if (view instanceof NewsView) {
+            selectedTab = daoNewsTab;
+        } else if (view instanceof EconomyView) {
+            selectedTab = factsAndFiguresTab;
         }
 
         selectedTab.setContent(view.getRoot());

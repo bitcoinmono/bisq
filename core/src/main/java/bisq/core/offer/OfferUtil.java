@@ -17,7 +17,6 @@
 
 package bisq.core.offer;
 
-import bisq.core.app.BisqEnvironment;
 import bisq.core.btc.wallet.BsqWalletService;
 import bisq.core.btc.wallet.Restrictions;
 import bisq.core.filter.FilterManager;
@@ -131,7 +130,7 @@ public class OfferUtil {
      * @return
      */
     public static boolean isBsqForMakerFeeAvailable(BsqWalletService bsqWalletService, @Nullable Coin amount) {
-        Coin availableBalance = bsqWalletService.getAvailableBalance();
+        Coin availableBalance = bsqWalletService.getAvailableConfirmedBalance();
         Coin makerFee = getMakerFee(false, amount);
 
         // If we don't know yet the maker fee (amount is not set) we return true, otherwise we would disable BSQ
@@ -139,8 +138,7 @@ public class OfferUtil {
         if (makerFee == null)
             return true;
 
-        return BisqEnvironment.isBaseCurrencySupportingBsq() &&
-                !availableBalance.subtract(makerFee).isNegative();
+        return !availableBalance.subtract(makerFee).isNegative();
     }
 
 
@@ -161,7 +159,7 @@ public class OfferUtil {
     }
 
     public static boolean isBsqForTakerFeeAvailable(BsqWalletService bsqWalletService, @Nullable Coin amount) {
-        Coin availableBalance = bsqWalletService.getAvailableBalance();
+        Coin availableBalance = bsqWalletService.getAvailableConfirmedBalance();
         Coin takerFee = getTakerFee(false, amount);
 
         // If we don't know yet the maker fee (amount is not set) we return true, otherwise we would disable BSQ
@@ -169,8 +167,7 @@ public class OfferUtil {
         if (takerFee == null)
             return true;
 
-        return BisqEnvironment.isBaseCurrencySupportingBsq() &&
-                !availableBalance.subtract(takerFee).isNegative();
+        return !availableBalance.subtract(takerFee).isNegative();
     }
 
     public static Volume getRoundedFiatVolume(Volume volumeByAmount) {
@@ -350,18 +347,18 @@ public class OfferUtil {
 
     public static void validateOfferData(FilterManager filterManager,
                                          P2PService p2PService,
-                                         Coin buyerSecurityDepositAsCoin,
+                                         double buyerSecurityDeposit,
                                          PaymentAccount paymentAccount,
                                          String currencyCode,
                                          Coin makerFeeAsCoin) {
         checkNotNull(makerFeeAsCoin, "makerFee must not be null");
         checkNotNull(p2PService.getAddress(), "Address must not be null");
-        checkArgument(buyerSecurityDepositAsCoin.compareTo(Restrictions.getMaxBuyerSecurityDeposit()) <= 0,
-                "securityDeposit must be not exceed " +
-                        Restrictions.getMaxBuyerSecurityDeposit().toFriendlyString());
-        checkArgument(buyerSecurityDepositAsCoin.compareTo(Restrictions.getMinBuyerSecurityDeposit()) >= 0,
-                "securityDeposit must be not be less than " +
-                        Restrictions.getMinBuyerSecurityDeposit().toFriendlyString());
+        checkArgument(buyerSecurityDeposit <= Restrictions.getMaxBuyerSecurityDepositAsPercent(),
+                "securityDeposit must not exceed " +
+                        Restrictions.getMaxBuyerSecurityDepositAsPercent());
+        checkArgument(buyerSecurityDeposit >= Restrictions.getMinBuyerSecurityDepositAsPercent(),
+                "securityDeposit must not be less than " +
+                        Restrictions.getMinBuyerSecurityDepositAsPercent());
         checkArgument(!filterManager.isCurrencyBanned(currencyCode),
                 Res.get("offerbook.warning.currencyBanned"));
         checkArgument(!filterManager.isPaymentMethodBanned(paymentAccount.getPaymentMethod()),

@@ -43,7 +43,7 @@ import bisq.core.notifications.alerts.price.PriceAlert;
 import bisq.core.offer.OpenOfferManager;
 import bisq.core.payment.AccountAgeWitnessService;
 import bisq.core.payment.PaymentAccount;
-import bisq.core.payment.payload.PaymentMethod;
+import bisq.core.payment.TradeLimits;
 import bisq.core.provider.fee.FeeService;
 import bisq.core.provider.price.PriceFeedService;
 import bisq.core.trade.TradeManager;
@@ -151,6 +151,7 @@ public class BisqSetup {
     private final AssetTradeActivityCheck tradeActivityCheck;
     private final AssetService assetService;
     private final TorSetup torSetup;
+    private final TradeLimits tradeLimits;
     private final BSFormatter formatter;
     @Setter
     @Nullable
@@ -228,6 +229,7 @@ public class BisqSetup {
                      AssetTradeActivityCheck tradeActivityCheck,
                      AssetService assetService,
                      TorSetup torSetup,
+                     TradeLimits tradeLimits,
                      BSFormatter formatter) {
 
 
@@ -267,6 +269,7 @@ public class BisqSetup {
         this.tradeActivityCheck = tradeActivityCheck;
         this.assetService = assetService;
         this.torSetup = torSetup;
+        this.tradeLimits = tradeLimits;
         this.formatter = formatter;
     }
 
@@ -355,6 +358,10 @@ public class BisqSetup {
         return walletAppSetup.getBtcSplashSyncIconId();
     }
 
+    public BooleanProperty getUseTorForBTC() {
+        return walletAppSetup.getUseTorForBTC();
+    }
+
     // P2P
     public StringProperty getP2PNetworkInfo() {
         return p2PNetworkSetup.getP2PNetworkInfo();
@@ -410,30 +417,35 @@ public class BisqSetup {
     }
 
     private void checkIfLocalHostNodeIsRunning() {
-        Thread checkIfLocalHostNodeIsRunningThread = new Thread(() -> {
-            Thread.currentThread().setName("checkIfLocalHostNodeIsRunningThread");
-            Socket socket = null;
-            try {
-                socket = new Socket();
-                socket.connect(new InetSocketAddress(InetAddresses.forString("127.0.0.1"),
-                        BisqEnvironment.getBaseCurrencyNetwork().getParameters().getPort()), 5000);
-                log.info("Localhost Bitcoin node detected.");
-                UserThread.execute(() -> {
-                    bisqEnvironment.setBitcoinLocalhostNodeRunning(true);
-                    step3();
-                });
-            } catch (Throwable e) {
-                UserThread.execute(BisqSetup.this::step3);
-            } finally {
-                if (socket != null) {
-                    try {
-                        socket.close();
-                    } catch (IOException ignore) {
+        // For DAO testnet we ignore local btc node
+        if (BisqEnvironment.getBaseCurrencyNetwork().isDaoRegTest() || BisqEnvironment.getBaseCurrencyNetwork().isDaoTestNet()) {
+            step3();
+        } else {
+            Thread checkIfLocalHostNodeIsRunningThread = new Thread(() -> {
+                Thread.currentThread().setName("checkIfLocalHostNodeIsRunningThread");
+                Socket socket = null;
+                try {
+                    socket = new Socket();
+                    socket.connect(new InetSocketAddress(InetAddresses.forString("127.0.0.1"),
+                            BisqEnvironment.getBaseCurrencyNetwork().getParameters().getPort()), 5000);
+                    log.info("Localhost Bitcoin node detected.");
+                    UserThread.execute(() -> {
+                        bisqEnvironment.setBitcoinLocalhostNodeRunning(true);
+                        step3();
+                    });
+                } catch (Throwable e) {
+                    UserThread.execute(BisqSetup.this::step3);
+                } finally {
+                    if (socket != null) {
+                        try {
+                            socket.close();
+                        } catch (IOException ignore) {
+                        }
                     }
                 }
-            }
-        });
-        checkIfLocalHostNodeIsRunningThread.start();
+            });
+            checkIfLocalHostNodeIsRunningThread.start();
+        }
     }
 
     private void readMapsFromResources() {
@@ -452,7 +464,6 @@ public class BisqSetup {
         Thread checkCryptoThread = new Thread(() -> {
             try {
                 Thread.currentThread().setName("checkCryptoThread");
-                log.trace("Run crypto test");
                 // just use any simple dummy msg
                 Ping payload = new Ping(1, 1);
                 SealedAndSigned sealedAndSigned = EncryptionService.encryptHybridWithSignature(payload,
@@ -484,6 +495,11 @@ public class BisqSetup {
         };
 
         Timer startupTimeout = UserThread.runAfter(() -> {
+            if (p2PNetworkSetup.p2pNetworkFailed.get()) {
+                // Skip this timeout action if the p2p network setup failed
+                // since a p2p network error prompt will be shown containing the error message
+                return;
+            }
             log.warn("startupTimeout called");
             if (walletsManager.areWalletsEncrypted())
                 walletInitialized.addListener(walletInitializedListener);
@@ -583,7 +599,7 @@ public class BisqSetup {
 
         clock.start();
 
-        PaymentMethod.onAllServicesInitialized();
+        tradeLimits.onAllServicesInitialized();
 
         disputeManager.onAllServicesInitialized();
 

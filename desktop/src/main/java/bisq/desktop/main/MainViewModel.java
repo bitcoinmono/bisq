@@ -97,6 +97,7 @@ public class MainViewModel implements ViewModel, BisqSetup.BisqSetupCompleteList
     private final DaoPresentation daoPresentation;
     private final P2PService p2PService;
     private final TradeManager tradeManager;
+    @Getter
     private final Preferences preferences;
     private final PrivateNotificationManager privateNotificationManager;
     private final WalletPasswordWindow walletPasswordWindow;
@@ -113,7 +114,7 @@ public class MainViewModel implements ViewModel, BisqSetup.BisqSetupCompleteList
 
     @Getter
     private BooleanProperty showAppScreen = new SimpleBooleanProperty();
-    private DoubleProperty combinedSyncProgress = new SimpleDoubleProperty();
+    private DoubleProperty combinedSyncProgress = new SimpleDoubleProperty(-1);
     private final BooleanProperty isSplashScreenRemoved = new SimpleBooleanProperty();
     private Timer checkNumberOfBtcPeersTimer;
     private Timer checkNumberOfP2pNetworkPeersTimer;
@@ -178,6 +179,7 @@ public class MainViewModel implements ViewModel, BisqSetup.BisqSetupCompleteList
         BalanceWithConfirmationTextField.setWalletService(btcWalletService);
 
         GUIUtil.setFeeService(feeService);
+        GUIUtil.setPreferences(preferences);
 
         setupHandlers();
         bisqSetup.addBisqSetupCompleteListener(this);
@@ -422,10 +424,10 @@ public class MainViewModel implements ViewModel, BisqSetup.BisqSetupCompleteList
     private void showFirstPopupIfResyncSPVRequested() {
         Popup firstPopup = new Popup<>();
         firstPopup.information(Res.get("settings.net.reSyncSPVAfterRestart")).show();
-        if (getBtcSyncProgress().get() == 1) {
+        if (bisqSetup.getBtcSyncProgress().get() == 1) {
             showSecondPopupIfResyncSPVRequested(firstPopup);
         } else {
-            getBtcSyncProgress().addListener((observable, oldValue, newValue) -> {
+            bisqSetup.getBtcSyncProgress().addListener((observable, oldValue, newValue) -> {
                 if ((double) newValue == 1)
                     showSecondPopupIfResyncSPVRequested(firstPopup);
             });
@@ -524,7 +526,7 @@ public class MainViewModel implements ViewModel, BisqSetup.BisqSetupCompleteList
         return combinedInfo;
     }
 
-    DoubleProperty getBtcSyncProgress() {
+    DoubleProperty getCombinedSyncProgress() {
         return combinedSyncProgress;
     }
 
@@ -534,6 +536,10 @@ public class MainViewModel implements ViewModel, BisqSetup.BisqSetupCompleteList
 
     StringProperty getBtcSplashSyncIconId() {
         return bisqSetup.getBtcSplashSyncIconId();
+    }
+
+    BooleanProperty getUseTorForBTC() {
+        return bisqSetup.getUseTorForBTC();
     }
 
     // P2P
@@ -584,6 +590,10 @@ public class MainViewModel implements ViewModel, BisqSetup.BisqSetupCompleteList
 
     IntegerProperty getMarketPriceUpdated() {
         return marketPricePresentation.getMarketPriceUpdated();
+    }
+
+    StringProperty getMarketPrice() {
+        return marketPricePresentation.getMarketPrice();
     }
 
     public ObservableList<PriceFeedComboBoxItem> getPriceFeedComboBoxItems() {

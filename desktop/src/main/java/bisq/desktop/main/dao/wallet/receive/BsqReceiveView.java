@@ -22,22 +22,17 @@ import bisq.desktop.common.view.FxmlView;
 import bisq.desktop.components.BsqAddressTextField;
 import bisq.desktop.components.TitledGroupBg;
 import bisq.desktop.main.dao.wallet.BsqBalanceUtil;
-import bisq.desktop.main.presentation.DaoPresentation;
-import bisq.desktop.util.FormBuilder;
-import bisq.desktop.util.GUIUtil;
 import bisq.desktop.util.Layout;
 
-import bisq.core.app.BisqEnvironment;
 import bisq.core.btc.wallet.BsqWalletService;
 import bisq.core.locale.Res;
-import bisq.core.user.Preferences;
 import bisq.core.util.BsqFormatter;
 
+import bisq.common.app.DevEnv;
 import bisq.common.util.Tuple3;
 
 import javax.inject.Inject;
 
-import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
@@ -52,7 +47,6 @@ public class BsqReceiveView extends ActivatableView<GridPane, Void> {
     private final BsqWalletService bsqWalletService;
     private final BsqFormatter bsqFormatter;
     private final BsqBalanceUtil bsqBalanceUtil;
-    private final Preferences preferences;
     private int gridRow = 0;
 
     ///////////////////////////////////////////////////////////////////////////////////////////
@@ -60,55 +54,24 @@ public class BsqReceiveView extends ActivatableView<GridPane, Void> {
     ///////////////////////////////////////////////////////////////////////////////////////////
 
     @Inject
-    private BsqReceiveView(BsqWalletService bsqWalletService, BsqFormatter bsqFormatter, BsqBalanceUtil bsqBalanceUtil,
-                           Preferences preferences) {
+    private BsqReceiveView(BsqWalletService bsqWalletService, BsqFormatter bsqFormatter, BsqBalanceUtil bsqBalanceUtil) {
         this.bsqWalletService = bsqWalletService;
         this.bsqFormatter = bsqFormatter;
         this.bsqBalanceUtil = bsqBalanceUtil;
-        this.preferences = preferences;
     }
 
     @Override
     public void initialize() {
-        if (BisqEnvironment.isDAOActivatedAndBaseCurrencySupportingBsq()) {
+        if (DevEnv.isDaoActivated()) {
             gridRow = bsqBalanceUtil.addGroup(root, gridRow);
 
             TitledGroupBg titledGroupBg = addTitledGroupBg(root, ++gridRow, 1,
                     Res.get("dao.wallet.receive.fundYourWallet"), Layout.GROUP_DISTANCE);
+            titledGroupBg.getStyleClass().add("last");
             GridPane.setColumnSpan(titledGroupBg, 3);
             Tuple3<Label, BsqAddressTextField, VBox> tuple = addLabelBsqAddressTextField(root, gridRow,
                     Res.get("dao.wallet.receive.bsqAddress"),
                     Layout.FIRST_ROW_AND_GROUP_DISTANCE);
-            addressTextField = tuple.second;
-            GridPane.setColumnSpan(tuple.third, 3);
-        } else {
-            addTitledGroupBg(root, gridRow, 6,
-                    Res.get("dao.wallet.receive.dao.headline"), 0);
-            FormBuilder.addMultilineLabel(root, gridRow, Res.get("dao.wallet.receive.daoInfo"), 10);
-
-            Button daoInfoButton = FormBuilder.addButton(root, ++gridRow, Res.get("dao.wallet.receive.daoInfo.button"));
-            daoInfoButton.setOnAction(e -> {
-                GUIUtil.openWebPage("https://bisq.network/dao");
-            });
-
-            FormBuilder.addMultilineLabel(root, ++gridRow, Res.get("dao.wallet.receive.daoTestnetInfo"));
-            Button daoContributorInfoButton = FormBuilder.addButton(root, ++gridRow, Res.get("dao.wallet.receive.daoTestnetInfo.button"));
-            daoContributorInfoButton.setOnAction(e -> {
-                GUIUtil.openWebPage("https://bisq.network/dao-testnet");
-            });
-
-            FormBuilder.addMultilineLabel(root, ++gridRow, Res.get("dao.wallet.receive.daoContributorInfo"));
-
-            Button daoTestnetInfoButton = FormBuilder.addButton(root, ++gridRow, Res.get("dao.wallet.receive.daoContributorInfo.button"));
-            daoTestnetInfoButton.setOnAction(e -> {
-                GUIUtil.openWebPage("https://bisq.network/dao-genesis");
-            });
-
-            addTitledGroupBg(root, ++gridRow, 1,
-                    Res.get("dao.wallet.receive.fundYourWallet"), 20);
-            Tuple3<Label, BsqAddressTextField, VBox> tuple = addLabelBsqAddressTextField(root, gridRow,
-                    Res.get("dao.wallet.receive.bsqAddress"),
-                    40);
             addressTextField = tuple.second;
             GridPane.setColumnSpan(tuple.third, 3);
         }
@@ -116,11 +79,7 @@ public class BsqReceiveView extends ActivatableView<GridPane, Void> {
 
     @Override
     protected void activate() {
-        // Hide dao new badge if user saw this page
-        if (!BisqEnvironment.isDAOActivatedAndBaseCurrencySupportingBsq())
-            preferences.dontShowAgain(DaoPresentation.DAO_NEWS, true);
-
-        if (BisqEnvironment.isDAOActivatedAndBaseCurrencySupportingBsq())
+        if (DevEnv.isDaoActivated())
             bsqBalanceUtil.activate();
 
         addressTextField.setAddress(bsqFormatter.getBsqAddressStringFromAddress(bsqWalletService.getUnusedAddress()));
@@ -128,7 +87,7 @@ public class BsqReceiveView extends ActivatableView<GridPane, Void> {
 
     @Override
     protected void deactivate() {
-        if (BisqEnvironment.isDAOActivatedAndBaseCurrencySupportingBsq())
+        if (DevEnv.isDaoActivated())
             bsqBalanceUtil.deactivate();
     }
 }

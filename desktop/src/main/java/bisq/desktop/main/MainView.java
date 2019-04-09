@@ -40,6 +40,7 @@ import bisq.desktop.main.settings.SettingsView;
 import bisq.desktop.util.Transitions;
 
 import bisq.core.exceptions.BisqException;
+import bisq.core.locale.GlobalSettings;
 import bisq.core.locale.Res;
 import bisq.core.util.BSFormatter;
 
@@ -80,10 +81,16 @@ import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 
+import javafx.beans.binding.ObjectBinding;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.beans.value.ChangeListener;
+
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
+
+import java.util.Locale;
 
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -186,6 +193,11 @@ public class MainView extends InitializableView<StackPane, MainViewModel> {
         JFXBadge daoButtonWithBadge = new JFXBadge(daoButton);
         daoButtonWithBadge.getStyleClass().add("new");
 
+        Locale locale = GlobalSettings.getLocale();
+        DecimalFormat currencyFormat = (DecimalFormat) NumberFormat.getNumberInstance(locale);
+        currencyFormat.setMinimumFractionDigits(2);
+        currencyFormat.setMaximumFractionDigits(2);
+
         root.sceneProperty().addListener((observable, oldValue, newValue) -> {
             if (newValue != null) {
                 newValue.addEventHandler(KeyEvent.KEY_RELEASED, keyEvent -> {
@@ -231,15 +243,75 @@ public class MainView extends InitializableView<StackPane, MainViewModel> {
         Tuple2<Label, VBox> availableBalanceBox = getBalanceBox(Res.get("mainView.balance.available"));
         availableBalanceBox.first.textProperty().bind(model.getAvailableBalance());
         availableBalanceBox.first.setPrefWidth(100);
-        availableBalanceBox.first.setTooltip(new Tooltip(Res.get("mainView.balance.available")));
+        availableBalanceBox.first.tooltipProperty().bind(new ObjectBinding<>() {
+            {
+                bind(model.getAvailableBalance());
+                bind(model.getMarketPrice());
+            }
+
+            @Override
+            protected Tooltip computeValue() {
+                String tooltipText = Res.get("mainView.balance.available");
+                try {
+                    double availableBalance = Double.parseDouble(
+                            model.getAvailableBalance().getValue().replace("BTC", ""));
+                    double marketPrice = Double.parseDouble(model.getMarketPrice().getValue());
+                    tooltipText += "\n" + currencyFormat.format(availableBalance * marketPrice) +
+                            " " + model.getPreferences().getPreferredTradeCurrency().getCode();
+                } catch (NullPointerException | NumberFormatException e) {
+                    // Either the balance or market price is not available yet
+                }
+                return new Tooltip(tooltipText);
+            }
+        });
 
         Tuple2<Label, VBox> reservedBalanceBox = getBalanceBox(Res.get("mainView.balance.reserved.short"));
         reservedBalanceBox.first.textProperty().bind(model.getReservedBalance());
-        reservedBalanceBox.first.setTooltip(new Tooltip(Res.get("mainView.balance.reserved")));
+        reservedBalanceBox.first.tooltipProperty().bind(new ObjectBinding<>() {
+            {
+                bind(model.getReservedBalance());
+                bind(model.getMarketPrice());
+            }
+
+            @Override
+            protected Tooltip computeValue() {
+                String tooltipText = Res.get("mainView.balance.reserved");
+                try {
+                    double reservedBalance = Double.parseDouble(
+                            model.getReservedBalance().getValue().replace("BTC", ""));
+                    double marketPrice = Double.parseDouble(model.getMarketPrice().getValue());
+                    tooltipText += "\n" + currencyFormat.format(reservedBalance * marketPrice) +
+                            " " + model.getPreferences().getPreferredTradeCurrency().getCode();
+                } catch (NullPointerException | NumberFormatException e) {
+                    // Either the balance or market price is not available yet
+                }
+                return new Tooltip(tooltipText);
+            }
+        });
 
         Tuple2<Label, VBox> lockedBalanceBox = getBalanceBox(Res.get("mainView.balance.locked.short"));
         lockedBalanceBox.first.textProperty().bind(model.getLockedBalance());
-        lockedBalanceBox.first.setTooltip(new Tooltip(Res.get("mainView.balance.locked")));
+        lockedBalanceBox.first.tooltipProperty().bind(new ObjectBinding<>() {
+            {
+                bind(model.getLockedBalance());
+                bind(model.getMarketPrice());
+            }
+
+            @Override
+            protected Tooltip computeValue() {
+                String tooltipText = Res.get("mainView.balance.locked");
+                try {
+                    double lockedBalance = Double.parseDouble(
+                            model.getLockedBalance().getValue().replace("BTC", ""));
+                    double marketPrice = Double.parseDouble(model.getMarketPrice().getValue());
+                    tooltipText += "\n" + currencyFormat.format(lockedBalance * marketPrice) +
+                            " " + model.getPreferences().getPreferredTradeCurrency().getCode();
+                } catch (NullPointerException | NumberFormatException e) {
+                    // Either the balance or market price is not available yet
+                }
+                return new Tooltip(tooltipText);
+            }
+        });
 
         HBox primaryNav = new HBox(marketButton, getNavigationSeparator(), buyButton, getNavigationSeparator(),
                 sellButton, getNavigationSeparator(), portfolioButtonWithBadge, getNavigationSeparator(), fundsButton);
@@ -466,7 +538,7 @@ public class MainView extends InitializableView<StackPane, MainViewModel> {
 
         btcSyncIndicator = new JFXProgressBar();
         btcSyncIndicator.setPrefWidth(305);
-        btcSyncIndicator.progressProperty().bind(model.getBtcSyncProgress());
+        btcSyncIndicator.progressProperty().bind(model.getCombinedSyncProgress());
 
         ImageView btcSyncIcon = new ImageView();
         btcSyncIcon.setVisible(false);
@@ -499,6 +571,13 @@ public class MainView extends InitializableView<StackPane, MainViewModel> {
         splashP2PNetworkLabel.getStyleClass().add("sub-info");
         splashP2PNetworkLabel.textProperty().bind(model.getP2PNetworkInfo());
 
+        Button showTorNetworkSettingsButton = new AutoTooltipButton(Res.get("settings.net.openTorSettingsButton"));
+        showTorNetworkSettingsButton.setVisible(false);
+        showTorNetworkSettingsButton.setManaged(false);
+        showTorNetworkSettingsButton.setOnAction(e -> {
+            model.getTorNetworkSettingsWindow().show();
+        });
+
         splashP2PNetworkBusyAnimation = new BusyAnimation(false);
 
         splashP2PNetworkErrorMsgListener = (ov, oldValue, newValue) -> {
@@ -508,20 +587,19 @@ public class MainView extends InitializableView<StackPane, MainViewModel> {
                 splashP2PNetworkLabel.getStyleClass().add("error-text");
                 splashP2PNetworkBusyAnimation.setDisable(true);
                 splashP2PNetworkBusyAnimation.stop();
+                showTorNetworkSettingsButton.setVisible(true);
+                showTorNetworkSettingsButton.setManaged(true);
+                if (model.getUseTorForBTC().get()) {
+                    // If using tor for BTC, hide the BTC status since tor is not working
+                    btcSyncIndicator.setVisible(false);
+                    btcSplashInfo.setVisible(false);
+                }
             } else if (model.getSplashP2PNetworkAnimationVisible().get()) {
                 splashP2PNetworkBusyAnimation.setDisable(false);
                 splashP2PNetworkBusyAnimation.play();
             }
         };
         model.getP2pNetworkWarnMsg().addListener(splashP2PNetworkErrorMsgListener);
-
-
-        Button showTorNetworkSettingsButton = new AutoTooltipButton(Res.get("settings.net.openTorSettingsButton"));
-        showTorNetworkSettingsButton.setVisible(false);
-        showTorNetworkSettingsButton.setManaged(false);
-        showTorNetworkSettingsButton.setOnAction(e -> {
-            model.getTorNetworkSettingsWindow().show();
-        });
 
         ImageView splashP2PNetworkIcon = new ImageView();
         splashP2PNetworkIcon.setId("image-connection-tor");
@@ -595,7 +673,7 @@ public class MainView extends InitializableView<StackPane, MainViewModel> {
         ProgressBar blockchainSyncIndicator = new JFXProgressBar(-1);
         blockchainSyncIndicator.setPrefWidth(80);
         blockchainSyncIndicator.setMaxHeight(10);
-        blockchainSyncIndicator.progressProperty().bind(model.getBtcSyncProgress());
+        blockchainSyncIndicator.progressProperty().bind(model.getCombinedSyncProgress());
 
         model.getWalletServiceErrorMsg().addListener((ov, oldValue, newValue) -> {
             if (newValue != null) {
@@ -612,7 +690,7 @@ public class MainView extends InitializableView<StackPane, MainViewModel> {
             }
         });
 
-        model.getBtcSyncProgress().addListener((ov, oldValue, newValue) -> {
+        model.getCombinedSyncProgress().addListener((ov, oldValue, newValue) -> {
             if ((double) newValue >= 1) {
                 blockchainSyncIndicator.setVisible(false);
                 blockchainSyncIndicator.setManaged(false);

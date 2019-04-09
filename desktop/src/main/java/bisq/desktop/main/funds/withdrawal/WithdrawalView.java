@@ -61,7 +61,7 @@ import com.google.common.util.concurrent.FutureCallback;
 
 import org.apache.commons.lang3.StringUtils;
 
-import de.jensd.fx.fontawesome.AwesomeIcon;
+import de.jensd.fx.glyphs.materialdesignicons.MaterialDesignIcon;
 
 import javafx.fxml.FXML;
 
@@ -352,7 +352,7 @@ public class WithdrawalView extends ActivatableView<VBox, Void> {
                                     @Override
                                     public void onSuccess(@javax.annotation.Nullable Transaction transaction) {
                                         if (transaction != null) {
-                                            log.debug("onWithdraw onSuccess tx ID:" + transaction.getHashAsString());
+                                            log.debug("onWithdraw onSuccess tx ID:{}", transaction.getHashAsString());
                                         } else {
                                             log.error("onWithdraw transaction is null");
                                         }
@@ -436,7 +436,7 @@ public class WithdrawalView extends ActivatableView<VBox, Void> {
 
     private void openBlockExplorer(WithdrawalListItem item) {
         if (item.getAddressString() != null)
-            GUIUtil.openWebPage(preferences.getBlockChainExplorer().addressUrl + item.getAddressString());
+            GUIUtil.openWebPage(preferences.getBlockChainExplorer().addressUrl + item.getAddressString(), false);
     }
 
 
@@ -548,7 +548,7 @@ public class WithdrawalView extends ActivatableView<VBox, Void> {
 
                                 if (item != null && !empty) {
                                     String address = item.getAddressString();
-                                    hyperlinkWithIcon = new HyperlinkWithIcon(address, AwesomeIcon.EXTERNAL_LINK);
+                                    hyperlinkWithIcon = new HyperlinkWithIcon(address, MaterialDesignIcon.LINK);
                                     hyperlinkWithIcon.setOnAction(event -> openBlockExplorer(item));
                                     hyperlinkWithIcon.setTooltip(new Tooltip(Res.get("tooltip.openBlockchainForAddress", address)));
                                     setAlignment(Pos.CENTER);
